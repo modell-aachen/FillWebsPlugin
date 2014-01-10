@@ -1,6 +1,5 @@
 !noci
 data/System/FillWebsPlugin.txt 0644 Documentation page
-data/Sandbox/PluginTestFillWebsPlugin.txt 0644 Examples
 lib/Foswiki/Plugins/FillWebsPlugin.pm 0444 Perl module
 lib/Foswiki/Plugins/FillWebsPlugin/Config.spec 0444 Configuration
 pub/System/FillWebsPlugin/fillwebsplugin.js 0644
