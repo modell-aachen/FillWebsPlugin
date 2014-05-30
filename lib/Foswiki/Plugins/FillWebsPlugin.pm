@@ -35,6 +35,7 @@ sub initPlugin {
     }
 
     Foswiki::Func::registerRESTHandler( 'fill', \&restFill );
+    Foswiki::Func::registerRESTHandler( 'reset', \&restReset );
 
     # Plugin correctly initialized
     return 1;
@@ -134,6 +135,71 @@ sub restFill {
         web    => $web,
         topic  => $topic,
         params => ['Operation finished!', $actions, $errors ]
+    );
+}
+
+sub restReset {
+    my ( $session, $subject, $verb, $response ) = @_;
+
+    my $allowed = $Foswiki::cfg{Plugins}{FillWebsPlugin}{Allowed} || $Foswiki::cfg{SuperAdminGroup} || 'admin';
+    unless ( _isAllowed($allowed)  ) {
+        return 'You are not allowed to do this!';
+    }
+
+    my $query = Foswiki::Func::getCgiQuery();
+    my $resetweb = $query->param( 'resetweb' );
+    my $srcweb = $query->param( 'srcweb' );
+
+    my $actions = '';
+    my $errors = '';
+
+    unless ( Foswiki::Func::webExists( $srcweb ) ) {
+        return "Template '$srcweb' does not exist.";
+    }
+
+    unless ( Foswiki::Func::isValidWebName( $resetweb ) ) {
+        my $url = Foswiki::Func::getScriptUrl(
+            $Foswiki::cfg{UsersWebName}, $Foswiki::cfg{HomeTopicName}, 'oops',
+            template => "oopsgeneric",
+            param1   => "Invalid web name '$resetweb'!",
+            param2   => "The name of the web you specified ($resetweb) is invalid."
+        );
+        Foswiki::Func::redirectCgiQuery( undef, $url );
+    }
+
+    if( Foswiki::Func::webExists($resetweb) ) {
+        # find free web in trash
+        my $trash = $Foswiki::cfg{TrashWebName};
+        my $count = 0;
+        my $trashname;
+        my $reset_esc = $resetweb;
+        $reset_esc =~ s#[/.]#_#g;
+        do {
+            $trashname = "$trash/${reset_esc}_$count";
+            $count++;
+        } while ( Foswiki::Func::webExists( $trashname ) );
+
+        Foswiki::Func::moveWeb( $resetweb, $trashname );
+        $actions .= "\n\nMoved web to trash: '$resetweb'";
+    }
+
+    Foswiki::Func::createWeb( $resetweb, $srcweb );
+    $actions .= "\n\nCreated web '$resetweb'";
+
+    my( $subActions, $subErrors ) = _fill( $srcweb, 1, $resetweb, 1, undef, 0, 5 );
+    $actions .= $subActions;
+    $errors .= $subErrors;
+
+    $actions = "none" unless $actions;
+    $actions = "Actions performed: $actions";
+
+    $errors = "HOWEVER there were ERRORS: $errors" if $errors;
+
+    throw Foswiki::OopsException(
+        'oopsgeneric',
+        web    => $resetweb,
+        topic  => $Foswiki::cfg{HomeTopicName},
+        params => ["Web '$resetweb' was reset!", $actions, $errors ]
     );
 }
 
