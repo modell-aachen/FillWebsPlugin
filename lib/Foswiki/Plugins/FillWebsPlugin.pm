@@ -34,8 +34,12 @@ sub initPlugin {
         return 0;
     }
 
-    Foswiki::Func::registerRESTHandler( 'fill', \&restFill );
-    Foswiki::Func::registerRESTHandler( 'reset', \&restReset );
+    Foswiki::Func::registerRESTHandler( 'fill', \&restFill,
+        authenticate => 1, http_allow => 'POST,GET', validate => 1
+    );
+    Foswiki::Func::registerRESTHandler( 'reset', \&restReset,
+        authenticate => 1, http_allow => 'POST,GET', validate => 1
+    );
 
     # Plugin correctly initialized
     return 1;
