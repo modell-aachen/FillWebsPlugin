@@ -63,6 +63,10 @@ sub restFill {
     } else {
         $skipWebs = '.*'; # do nothing if parameter is not provided
     }
+    my $skipTopics = $query->param( 'skiptopics' );
+    if($skipTopics) {
+        $skipTopics = qr#$skipTopics#;
+    }
     my $createWeb = $query->{param}->{createweb};
     $createWeb = $createWeb->[0] if $createWeb;
     my $maxdepth = $query->{param}->{maxdepth};
@@ -113,13 +117,13 @@ sub restFill {
             }
         }
 
-        my ( $subActions, $subErrors ) = _fill($srcWeb, $recurseSrc, $target, $recursive, $skipWebs, 1, $maxdepth);
+        my ( $subActions, $subErrors ) = _fill($srcWeb, $recurseSrc, $target, $recursive, $skipWebs, $skipTopics, 1, $maxdepth);
         $actions .= $subActions;
         $errors .= $subErrors;
     } else {
         foreach my $eachWeb (Foswiki::Func::getListOfWebs('user')) {
             next if ( $eachWeb =~ m#/# );
-            my ( $subActions, $subErrors ) = _fill($srcWeb, $recurseSrc, $eachWeb, $recursive, $skipWebs, 1, $maxdepth );
+            my ( $subActions, $subErrors ) = _fill($srcWeb, $recurseSrc, $eachWeb, $recursive, $skipWebs, $skipTopics, 1, $maxdepth );
             $actions .= $subActions;
             $errors .= $subErrors;
         }
@@ -149,6 +153,10 @@ sub restReset {
     my $query = Foswiki::Func::getCgiQuery();
     my $resetweb = $query->param( 'resetweb' );
     my $srcweb = $query->param( 'srcweb' );
+    my $skiptopics = $query->param( 'skiptopics' );
+    if($skiptopics) {
+        $skiptopics = qr#$skiptopics#;
+    }
 
     my $actions = '';
     my $errors = '';
@@ -186,7 +194,7 @@ sub restReset {
     Foswiki::Func::createWeb( $resetweb, $srcweb );
     $actions .= "\n\nCreated web '$resetweb'";
 
-    my( $subActions, $subErrors ) = _fill( $srcweb, 1, $resetweb, 1, undef, 0, 5 );
+    my( $subActions, $subErrors ) = _fill( $srcweb, 1, $resetweb, 1, undef, $skiptopics, 0, 5 );
     $actions .= $subActions;
     $errors .= $subErrors;
 
@@ -204,7 +212,7 @@ sub restReset {
 }
 
 sub _fill {
-    my ( $srcWeb, $recurseSrc, $target, $recurseTarget, $skipWebs, $depth,  $maxdepth ) = @_;
+    my ( $srcWeb, $recurseSrc, $target, $recurseTarget, $skipWebs, $skipTopics, $depth,  $maxdepth ) = @_;
 
     my $levelstring = ' * ' x $depth;
 
@@ -223,6 +231,7 @@ sub _fill {
     my $errorString = '';
 
     foreach my $topic ( @topics ) {
+        next if $skipTopics && $topic =~ m#$skipTopics#;
         my ( $meta, $text ) = Foswiki::Func::readTopic( $srcWeb, $topic );
 
         # copy topic (text)
@@ -258,7 +267,7 @@ sub _fill {
                 $actionString .= "\n\n${levelstring}$message";
             }
 
-            my ( $subActions, $subErrors ) = _fill($subSrc, $recurseSrc, $subTarget, $recurseTarget, $skipWebs, $depth + 1, $maxdepth);
+            my ( $subActions, $subErrors ) = _fill($subSrc, $recurseSrc, $subTarget, $recurseTarget, $skipWebs, $skipTopics, $depth + 1, $maxdepth);
             $actionString .= $subActions;
             $errorString .= $subErrors;
         }
@@ -274,7 +283,7 @@ sub _fill {
             }
             next if $skip;
 
-            my ( $subActions, $subErrors ) = _fill($srcWeb, $recurseSrc, "$target/$targetSub", $recurseTarget, $skipWebs, $depth + 1, $maxdepth);
+            my ( $subActions, $subErrors ) = _fill($srcWeb, $recurseSrc, "$target/$targetSub", $recurseTarget, $skipWebs, $skipTopics, $depth + 1, $maxdepth);
             $actionString .= $subActions;
             $errorString .= $subErrors;
         }

@@ -24,6 +24,7 @@ Allowed users can be set in =configure=.
 | <label for="target">TargetWeb for the topics%BR%Leave empty for all webs!</label> | <input type="text" name="target" value="" /> |
 | <label for="createweb">Create a new web</label> | <input type="checkbox" name="createweb" value="1" /> |
 | <label for="skipweb">Skip webs matching this regexp</label> | <input type="text" name="skipwebs" value="^(%SYSTEMWEB%&#124;Sandbox&#124;Main&#124;Trash)($&#124;/)"; /> |
+| <label for="skiptopics">Skip topics matching this regexp</label> | <input type="text" name="skiptopics" value="^(?:WebStatistics)$"; /> |
 | <label for="recursive">Recurse to subwebs of target</label> | <input type="checkbox" name="recursive" value="1" /> |
 | <input type="submit" /> ||
 <input type="hidden" name="redirect" value="%INCLUDINGWEB%.%INCLUDINGTOPIC%" />
@@ -44,6 +45,7 @@ A typical FillWebsPlugin form will look like this:
 &lt;input type="hidden" name="redirect" value="%%NOP%INCLUDINGWEB%.%%NOP%INCLUDINGTOPIC%" /&gt;
 &lt;input type="hidden" name="createweb" value="1" /&gt; <b>&lt;-- setting this to '0' will cause an error if the target web does not exist --&gt;</b>
 &lt;input type="hidden" name="skipwebs" value="^(%%NOP%SYSTEMWEB%&#124;Sandbox&#124;Main&#124;Trash)($&#124;/)"; /&gt;
+&lt;input type="hidden" name="skiptopcs" value="^(?:WebStatistics)$"; /&gt;
 &lt;input type="hidden" name="recursive" value="0" /&gt;
 &lt;input type="hidden" name="confirmation" value="Are you sure?" /&gt; <b>&lt;-- This will be prompted on submit. You can use the pseudo variables '$srcweb', '$target' and '$resetweb' as placeholders for the corresponding input fields. --&gt;</b>
 &lt;/div&gt;&lt;/form&gt;
@@ -58,6 +60,7 @@ Use this form to fill existing webs. You can include it with =%%NOP%INCLUDE{"%WE
 | <label for="recursivesrc">Recurse into subwebs of SourceWeb</label> | <input type="checkbox" name="recursesrc" value="1" /> |
 | <label for="target">TargetWeb for the topics%BR%Leave empty for all webs!</label> | <input type="text" name="target" value="" /> |
 | <label for="skipweb">Skip webs matching this regexp</label> | <input type="text" name="skipwebs" value="^(%SYSTEMWEB%&#124;Sandbox&#124;Main&#124;Trash)($&#124;/)"; /> |
+| <label for="skiptopics">Skip topics matching this regexp</label> | <input type="text" name="skiptopics" value="^(?:WebStatistics)$"; /> |
 | <label for="recursive">Recurse to subwebs of target</label> | <input type="checkbox" name="recursive" value="1" /> |
 | <input type="submit" value="Fill webs"/> ||
 <input type="hidden" name="redirect" value="%INCLUDINGWEB%.%INCLUDINGTOPIC%" />
@@ -77,6 +80,7 @@ Use this form to create a new web. You can include it with =%%NOP%INCLUDE{"%WEB%
 <input type="hidden" name="redirect" value="%INCLUDINGWEB%.%INCLUDINGTOPIC%" />
 <input type="hidden" name="createweb" value="1" />
 <input type="hidden" name="skipwebs" value="^(%SYSTEMWEB%&#124;Sandbox&#124;Main&#124;Trash)($&#124;/)"; />
+<input type="hidden" name="skiptopics" value="^(WebStatistics)$"; />
 <input type="hidden" name="recursive" value="0" />
 </div></form>
 %ENDSECTION{"create"}%
@@ -93,6 +97,7 @@ Use this form to reset a web to a template. The existing web will be deleted and
 <input type="hidden" name="redirect" value="%INCLUDINGWEB%.%INCLUDINGTOPIC%" />
 <input type="hidden" name="createweb" value="1" />
 <input type="hidden" name="skipwebs" value="^(%SYSTEMWEB%&#124;Sandbox&#124;Main&#124;Trash)($&#124;/)"; />
+<input type="hidden" name="skiptopics" value="^(WebStatistics)$"; />
 <input type="hidden" name="recursive" value="0" />
 <input type="hidden" name="confirmation" value="Do you really want to reset $resetweb to $srcweb?" />
 </div></form>
