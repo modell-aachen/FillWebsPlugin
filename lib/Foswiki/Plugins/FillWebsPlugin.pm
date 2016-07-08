@@ -317,7 +317,7 @@ sub _fill {
                     "$Foswiki::cfg{PubDir}/$srcWeb/$topic" => "$Foswiki::cfg{PubDir}/$target/$topic",
                 };
                 my $gotProblems;
-                foreach my $src ( keys $links ) {
+                foreach my $src ( keys %$links ) {
                     next unless -e $src;
                     my $dst = $links->{$src};
                     $src = readlink($src) if -l $src;
@@ -328,7 +328,7 @@ sub _fill {
                     }
                 }
                 unless ( $gotProblems ) {
-                    foreach my $src ( keys $links ) {
+                    foreach my $src ( keys %$links ) {
                         next unless -e $src;
                         my $dst = $links->{$src};
                         $src = readlink($src) if -l $src;
