@@ -34,8 +34,12 @@ sub initPlugin {
         return 0;
     }
 
-    Foswiki::Func::registerRESTHandler( 'fill', \&restFill );
-    Foswiki::Func::registerRESTHandler( 'reset', \&restReset );
+    Foswiki::Func::registerRESTHandler( 'fill', \&restFill,
+        authenticate => 1, http_allow => 'POST,GET', validate => 1
+    );
+    Foswiki::Func::registerRESTHandler( 'reset', \&restReset,
+        authenticate => 1, http_allow => 'POST,GET', validate => 1
+    );
 
     # Plugin correctly initialized
     return 1;
@@ -63,6 +67,11 @@ sub restFill {
     } else {
         $skipWebs = '.*'; # do nothing if parameter is not provided
     }
+    my $skipTopics = $query->param( 'skiptopics' );
+    if($skipTopics) {
+        $skipTopics = qr#$skipTopics#;
+    }
+    my $keepSymlinks = $query->param( 'keepsymlinks' );
     my $createWeb = $query->{param}->{createweb};
     $createWeb = $createWeb->[0] if $createWeb;
     my $maxdepth = $query->{param}->{maxdepth};
@@ -100,8 +109,9 @@ sub restFill {
                     Foswiki::Func::redirectCgiQuery( undef, $url );
                 }
 
-                Foswiki::Func::createWeb( $target, $srcWeb );
-                $actions .= "\n\nCreated web '$target'";
+                my ($createAction, $createErrors) = _createOrLinkWeb($target, $srcWeb, '', $keepSymlinks);
+                $actions .= $createAction;
+                $errors .= $createErrors;
             } else {
                 my $url = Foswiki::Func::getScriptUrl(
                     $web, $topic, 'oops',
@@ -113,13 +123,13 @@ sub restFill {
             }
         }
 
-        my ( $subActions, $subErrors ) = _fill($srcWeb, $recurseSrc, $target, $recursive, $skipWebs, 1, $maxdepth);
+        my ( $subActions, $subErrors ) = _fill($srcWeb, $recurseSrc, $target, $recursive, $skipWebs, $skipTopics, 1, $maxdepth, $keepSymlinks);
         $actions .= $subActions;
         $errors .= $subErrors;
     } else {
         foreach my $eachWeb (Foswiki::Func::getListOfWebs('user')) {
             next if ( $eachWeb =~ m#/# );
-            my ( $subActions, $subErrors ) = _fill($srcWeb, $recurseSrc, $eachWeb, $recursive, $skipWebs, 1, $maxdepth );
+            my ( $subActions, $subErrors ) = _fill($srcWeb, $recurseSrc, $eachWeb, $recursive, $skipWebs, $skipTopics, 1, $maxdepth, $keepSymlinks );
             $actions .= $subActions;
             $errors .= $subErrors;
         }
@@ -138,6 +148,57 @@ sub restFill {
     );
 }
 
+sub _createOrLinkWeb {
+    my ( $target, $srcWeb, $levelstring, $keepSymlinks ) = @_;
+
+    if ( $keepSymlinks ) {
+        my $dir = "$Foswiki::cfg{DataDir}/$srcWeb";
+        if ( -l $dir ) {
+            my $actionString = "\n\n${levelstring}web: ${target}";
+            $levelstring .= ' * ';
+
+            my $newDir = "$Foswiki::cfg{DataDir}/$target";
+            my $dst = readlink($dir);
+            unless ( -e $newDir ) {
+                $actionString .= "\n\n${levelstring}data-dir symlinked";
+                symlink $dst, $newDir;
+            } else {
+                unless ( -l $newDir ) {
+                    return ( $actionString, "\n\nCould not link '$newDir' to '$dst' because it already exists and is no symbolic link" );
+                }
+                unless ( readlink($newDir) eq $dst ) {
+                    return ( $actionString, "\n\nCould not link '$newDir' to '$dst' because it already exists and points to " . readlink($newDir) );
+                }
+                $actionString .= "\n\n${levelstring}data-dir already symlinked";
+            }
+
+            my $pubDir = "$Foswiki::cfg{PubDir}/$srcWeb";
+            if ( -e $pubDir ) {
+                my $newPubDir = "$Foswiki::cfg{PubDir}/$target";
+                unless ( -l $pubDir ) {
+                        return ( $actionString, "\n\nCould not link '$newPubDir' because '$pubDir' is not a symbolic link" );
+                }
+                my $pubDst = readlink($pubDir);
+                unless ( -e $newPubDir ) {
+                    $actionString .= "\n\n${levelstring}pub-dir symlinked";
+                    symlink $pubDst, $newPubDir;
+                } else {
+                    if ( -l $newPubDir && readlink($newPubDir) eq $dst ) {
+                        $actionString .= "\n\n${levelstring}pub-dir already symlinked";
+                    } else {
+                        return ( $actionString, "\n\nCould not link '$newPubDir' to '$pubDst'" );
+                    }
+                }
+            }
+
+            return ( $actionString, '' );
+        }
+    }
+
+    Foswiki::Func::createWeb( $target, $srcWeb );
+    return ("\n\n${levelstring}Created web '$target'", '');
+}
+
 sub restReset {
     my ( $session, $subject, $verb, $response ) = @_;
 
@@ -149,6 +210,11 @@ sub restReset {
     my $query = Foswiki::Func::getCgiQuery();
     my $resetweb = $query->param( 'resetweb' );
     my $srcweb = $query->param( 'srcweb' );
+    my $skiptopics = $query->param( 'skiptopics' );
+    if($skiptopics) {
+        $skiptopics = qr#$skiptopics#;
+    }
+    my $keepSymlinks = $query->param( 'keepsymlinks' );
 
     my $actions = '';
     my $errors = '';
@@ -183,10 +249,11 @@ sub restReset {
         $actions .= "\n\nMoved web to trash: '$resetweb'";
     }
 
-    Foswiki::Func::createWeb( $resetweb, $srcweb );
-    $actions .= "\n\nCreated web '$resetweb'";
+    my ($createAction, $createErrors) = _createOrLinkWeb($resetweb, $srcweb, '', $keepSymlinks);
+    $actions .= $createAction;
+    $errors .= $createErrors;
 
-    my( $subActions, $subErrors ) = _fill( $srcweb, 1, $resetweb, 1, undef, 0, 5 );
+    my( $subActions, $subErrors ) = _fill( $srcweb, 1, $resetweb, 1, undef, $skiptopics, 0, 5, $keepSymlinks );
     $actions .= $subActions;
     $errors .= $subErrors;
 
@@ -204,13 +271,31 @@ sub restReset {
 }
 
 sub _fill {
-    my ( $srcWeb, $recurseSrc, $target, $recurseTarget, $skipWebs, $depth,  $maxdepth ) = @_;
+    my ( $srcWeb, $recurseSrc, $target, $recurseTarget, $skipWebs, $skipTopics, $depth,  $maxdepth, $keepSymlinks ) = @_;
 
     my $levelstring = ' * ' x $depth;
 
     return ('', "\n\n${levelstring}maxdepth ($maxdepth) has been reached!") if ( $maxdepth <= $depth );
 
     return ('', '') if ( $target =~ m#$skipWebs# ); # I trust that authorized users provide valid regexes
+
+    my $actionString = '';
+    my $errorString = '';
+
+    my $dir = "$Foswiki::cfg{DataDir}/$target";
+    if ( -l $dir ) {
+        if ( $keepSymlinks ) {
+            my $target = readlink($dir);
+            my $srcDir = "$Foswiki::cfg{DataDir}/$srcWeb";
+            $srcDir = readlink($srcDir) if -l $srcDir;
+            unless ( $srcDir eq $target ) {
+                return ('', "Symbolic link '$dir' is not pointing to $target");
+            }
+            return ('', '');
+        } else {
+            return ('', "Found symbolic link '$dir', but not keeping symlinks.");
+        }
+    }
 
     # I suppose efficiancy is not so much of an issue, so I re-read the
     # webs/topics for every web I process...
@@ -219,10 +304,45 @@ sub _fill {
     # list of direct subwebs in source.
     my @srcSubwebs = ( ( $recurseSrc ) ? _getDirectSubwebs($srcWeb) : () );
 
-    my $actionString = '';
-    my $errorString = '';
-
     foreach my $topic ( @topics ) {
+        next if $skipTopics && $topic =~ m#$skipTopics#;
+
+        if ( $keepSymlinks ) {
+            my $txtFile = "$Foswiki::cfg{DataDir}/$srcWeb/$topic.txt";
+            if ( -l $txtFile ) {
+                my $links = {
+                    $txtFile => "$Foswiki::cfg{DataDir}/$target/$topic.txt",
+                    "$txtFile,v" => "$Foswiki::cfg{DataDir}/$target/$topic.txt,v",
+                    "$Foswiki::cfg{DataDir}/$srcWeb/$topic,pfv" => "$Foswiki::cfg{DataDir}/$target/$topic,pfv",
+                    "$Foswiki::cfg{PubDir}/$srcWeb/$topic" => "$Foswiki::cfg{PubDir}/$target/$topic",
+                };
+                my $gotProblems;
+                foreach my $src ( keys %$links ) {
+                    next unless -e $src;
+                    my $dst = $links->{$src};
+                    $src = readlink($src) if -l $src;
+                    if ( -e $dst ) {
+                        next if -l $dst && readlink($dst) eq $src;
+                        $errorString .= "\n\n${levelstring}Could not symlink $srcWeb.$topic, because $dst already exists but points to ".readlink($dst)."!";
+                        $gotProblems = 1;
+                    }
+                }
+                unless ( $gotProblems ) {
+                    foreach my $src ( keys %$links ) {
+                        next unless -e $src;
+                        my $dst = $links->{$src};
+                        $src = readlink($src) if -l $src;
+                        next if -e $dst;
+
+                        symlink $src, $dst;
+                        $actionString .= "\n\n${levelstring}symlinked '$src' to '$dst'";
+                    }
+                }
+
+                next;
+            }
+        }
+
         my ( $meta, $text ) = Foswiki::Func::readTopic( $srcWeb, $topic );
 
         # copy topic (text)
@@ -252,13 +372,12 @@ sub _fill {
             my $subSrc = "$srcWeb/$eachWeb";
             Foswiki::Func::writeWarning("handling $eachWeb for $subTarget");
             unless ( Foswiki::Func::webExists( $subTarget ) ) {
-                Foswiki::Func::createWeb( $subTarget, $subSrc );
-                my $message .= "Created web $subTarget";
-                Foswiki::Func::writeWarning( $message );
-                $actionString .= "\n\n${levelstring}$message";
+                my ($createAction, $createErrors) = _createOrLinkWeb($subTarget, $subSrc, $levelstring, $keepSymlinks);
+                $actionString .= $createAction;
+                $errorString .= $createErrors;
             }
 
-            my ( $subActions, $subErrors ) = _fill($subSrc, $recurseSrc, $subTarget, $recurseTarget, $skipWebs, $depth + 1, $maxdepth);
+            my ( $subActions, $subErrors ) = _fill($subSrc, $recurseSrc, $subTarget, $recurseTarget, $skipWebs, $skipTopics, $depth + 1, $maxdepth, $keepSymlinks);
             $actionString .= $subActions;
             $errorString .= $subErrors;
         }
@@ -274,7 +393,7 @@ sub _fill {
             }
             next if $skip;
 
-            my ( $subActions, $subErrors ) = _fill($srcWeb, $recurseSrc, "$target/$targetSub", $recurseTarget, $skipWebs, $depth + 1, $maxdepth);
+            my ( $subActions, $subErrors ) = _fill($srcWeb, $recurseSrc, "$target/$targetSub", $recurseTarget, $skipWebs, $skipTopics, $depth + 1, $maxdepth, $keepSymlinks);
             $actionString .= $subActions;
             $errorString .= $subErrors;
         }
