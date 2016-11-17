@@ -334,6 +334,8 @@ sub _fill {
                         $src = readlink($src) if -l $src;
                         next if -e $dst;
 
+                        $src = Foswiki::Sandbox::untaintUnchecked($src);
+                        $dst = Foswiki::Sandbox::untaintUnchecked($dst);
                         symlink $src, $dst;
                         $actionString .= "\n\n${levelstring}symlinked '$src' to '$dst'";
                     }
