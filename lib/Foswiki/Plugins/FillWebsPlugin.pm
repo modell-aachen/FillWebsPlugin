@@ -301,6 +301,12 @@ sub _fill {
     # webs/topics for every web I process...
     my @topics = Foswiki::Func::getTopicList( $srcWeb );
 
+    # Sort topics to copy forms first
+    my @formTopics = grep { $_ =~ /.*Form$/ } @topics;
+    my @nonFormTopics = grep { $_ !~ /.*Form$/ } @topics;
+    @topics = @formTopics;
+    push(@topics, @nonFormTopics);
+
     # list of direct subwebs in source.
     my @srcSubwebs = ( ( $recurseSrc ) ? _getDirectSubwebs($srcWeb) : () );
 
