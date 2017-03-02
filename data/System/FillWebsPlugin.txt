@@ -47,6 +47,8 @@ A typical FillWebsPlugin form will look like this:
 &lt;input type="hidden" name="createweb" value="1" /&gt; <b>&lt;-- setting this to '0' will cause an error if the target web does not exist --&gt;</b>
 &lt;input type="hidden" name="skipwebs" value="^(%%NOP%SYSTEMWEB%&#124;Sandbox&#124;Main&#124;Trash)($&#124;/)" /&gt;
 &lt;input type="hidden" name="skiptopcs" value="^(?:WebStatistics)$" /&gt;
+&lt;input type="hidden" name="alwaysCopy" value="^(?:WebHome)$" /&gt; <b>&lt;-- This regex overrides skiptopics. Also these topics will be <em>de-virtualized</em>. --&gt;</b>
+&lt;input type="hidden" name="overwriteTopics" value="^(?:WebHome)$" /&gt; <b>&lt;-- Topics matching this regex will be overwritten, even if they already exist. --&gt;</b>
 &lt;input type="hidden" name="keepsymlinks" value="0" /&gt;
 &lt;input type="hidden" name="recursive" value="0" /&gt;
 &lt;input type="hidden" name="confirmation" value="Are you sure?" /&gt; <b>&lt;-- This will be prompted on submit. You can use the pseudo variables '$srcweb', '$target' and '$resetweb' as placeholders for the corresponding input fields. --&gt;</b>
