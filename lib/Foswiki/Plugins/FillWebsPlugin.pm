@@ -280,6 +280,26 @@ sub restReset {
     );
 }
 
+sub fill {
+    my $options = shift;
+
+    my ($srcWeb) = Foswiki::Func::normalizeWebTopicName($options->{srcWeb}, 'Dummy');
+
+    my ($target) = Foswiki::Func::normalizeWebTopicName($options->{target} || $options->{targetWeb} || 'dummy', 'Dummy');
+    return ('', 'Missing target (targetWeb) parameter') if $target eq 'dummy';
+
+    my $recurseSrc = $options->{recurseSrc};
+    my $recurseTarget = $options->{recurseTarget};
+    my $skipWebs = $options->{skipWebs} || "";
+    my $skipTopics = $options->{skipTopics} || "";
+    my $unskipTopics = $options->{unskipTopics};
+    my $overwriteTopics = $options->{overwriteTopics};
+    my $keepSymlinks = $options->{keepSymlinks};
+    my $maxdepth = $options->{maxdepth} || 10;
+
+    return _fill($srcWeb, $recurseSrc, $target, $recurseTarget, $skipWebs, $skipTopics, $unskipTopics, $overwriteTopics, 0, $maxdepth, $keepSymlinks);
+}
+
 sub _fill {
     my ( $srcWeb, $recurseSrc, $target, $recurseTarget, $skipWebs, $skipTopics, $unskipTopics, $overwriteTopics, $depth,  $maxdepth, $keepSymlinks ) = @_;
 
