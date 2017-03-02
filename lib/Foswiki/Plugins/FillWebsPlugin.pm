@@ -195,7 +195,15 @@ sub _createOrLinkWeb {
         }
     }
 
-    Foswiki::Func::createWeb( $target, $srcWeb );
+    # Create new web.
+    # Note: We do not use $srcWeb as source, because this will copy any Web.*
+    # topic, even if it is a virtual topic.
+    Foswiki::Func::createWeb( $target );
+    # we copied / generated default preferences, copy over
+    my ($meta) = Foswiki::Func::readTopic( $srcWeb, $Foswiki::cfg{WebPrefsTopicName} );
+    $meta->web( $target );
+    $meta->save();
+
     return ("\n\n${levelstring}Created web '$target'", '');
 }
 
