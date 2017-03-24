@@ -61,6 +61,8 @@ sub restFill {
     $recurseSrc = $recurseSrc->[0] if $recurseSrc;
     my $recursive = $query->{param}->{recursive};
     $recursive = $recursive->[0] if $recursive;
+    my $alwaysCopy = $query->param('alwaysCopy');
+    my $overwriteTopics = $query->param('overwriteTopics');
     my $skipWebs = $query->{param}->{skipwebs};
     if ( $skipWebs && $skipWebs->[0] ) {
         $skipWebs = $skipWebs->[0];
@@ -123,13 +125,13 @@ sub restFill {
             }
         }
 
-        my ( $subActions, $subErrors ) = _fill($srcWeb, $recurseSrc, $target, $recursive, $skipWebs, $skipTopics, 1, $maxdepth, $keepSymlinks);
+        my ( $subActions, $subErrors ) = _fill($srcWeb, $recurseSrc, $target, $recursive, $skipWebs, $skipTopics, $alwaysCopy, $overwriteTopics, 1, $maxdepth, $keepSymlinks);
         $actions .= $subActions;
         $errors .= $subErrors;
     } else {
         foreach my $eachWeb (Foswiki::Func::getListOfWebs('user')) {
             next if ( $eachWeb =~ m#/# );
-            my ( $subActions, $subErrors ) = _fill($srcWeb, $recurseSrc, $eachWeb, $recursive, $skipWebs, $skipTopics, 1, $maxdepth, $keepSymlinks );
+            my ( $subActions, $subErrors ) = _fill($srcWeb, $recurseSrc, $eachWeb, $recursive, $skipWebs, $skipTopics, $alwaysCopy, $overwriteTopics, 1, $maxdepth, $keepSymlinks );
             $actions .= $subActions;
             $errors .= $subErrors;
         }
@@ -195,7 +197,15 @@ sub _createOrLinkWeb {
         }
     }
 
-    Foswiki::Func::createWeb( $target, $srcWeb );
+    # Create new web.
+    # Note: We do not use $srcWeb as source, because this will copy any Web.*
+    # topic, even if it is a virtual topic.
+    Foswiki::Func::createWeb( $target );
+    # we copied / generated default preferences, copy over
+    my ($meta) = Foswiki::Func::readTopic( $srcWeb, $Foswiki::cfg{WebPrefsTopicName} );
+    $meta->web( $target );
+    $meta->save();
+
     return ("\n\n${levelstring}Created web '$target'", '');
 }
 
@@ -253,7 +263,7 @@ sub restReset {
     $actions .= $createAction;
     $errors .= $createErrors;
 
-    my( $subActions, $subErrors ) = _fill( $srcweb, 1, $resetweb, 1, undef, $skiptopics, 0, 5, $keepSymlinks );
+    my( $subActions, $subErrors ) = _fill( $srcweb, 1, $resetweb, 1, undef, $skiptopics, undef, undef, 0, 5, $keepSymlinks );
     $actions .= $subActions;
     $errors .= $subErrors;
 
@@ -270,8 +280,28 @@ sub restReset {
     );
 }
 
+sub fill {
+    my $options = shift;
+
+    my ($srcWeb) = Foswiki::Func::normalizeWebTopicName($options->{srcWeb}, 'Dummy');
+
+    my ($target) = Foswiki::Func::normalizeWebTopicName($options->{target} || $options->{targetWeb} || 'dummy', 'Dummy');
+    return ('', 'Missing target (targetWeb) parameter') if $target eq 'dummy';
+
+    my $recurseSrc = $options->{recurseSrc};
+    my $recurseTarget = $options->{recurseTarget};
+    my $skipWebs = $options->{skipWebs} || "";
+    my $skipTopics = $options->{skipTopics} || "";
+    my $unskipTopics = $options->{unskipTopics};
+    my $overwriteTopics = $options->{overwriteTopics};
+    my $keepSymlinks = $options->{keepSymlinks};
+    my $maxdepth = $options->{maxdepth} || 10;
+
+    return _fill($srcWeb, $recurseSrc, $target, $recurseTarget, $skipWebs, $skipTopics, $unskipTopics, $overwriteTopics, 0, $maxdepth, $keepSymlinks);
+}
+
 sub _fill {
-    my ( $srcWeb, $recurseSrc, $target, $recurseTarget, $skipWebs, $skipTopics, $depth,  $maxdepth, $keepSymlinks ) = @_;
+    my ( $srcWeb, $recurseSrc, $target, $recurseTarget, $skipWebs, $skipTopics, $unskipTopics, $overwriteTopics, $depth,  $maxdepth, $keepSymlinks ) = @_;
 
     my $levelstring = ' * ' x $depth;
 
@@ -311,7 +341,10 @@ sub _fill {
     my @srcSubwebs = ( ( $recurseSrc ) ? _getDirectSubwebs($srcWeb) : () );
 
     foreach my $topic ( @topics ) {
-        next if $skipTopics && $topic =~ m#$skipTopics#;
+        unless (defined $unskipTopics && $topic =~ m#$unskipTopics#) {
+            next if $skipTopics && $topic =~ m#$skipTopics#;
+            next if $Foswiki::Plugins::SESSION->{store}->can('isVirtualTopic') && $Foswiki::Plugins::SESSION->{store}->isVirtualTopic($srcWeb, $topic);
+        }
 
         if ( $keepSymlinks ) {
             my $txtFile = "$Foswiki::cfg{DataDir}/$srcWeb/$topic.txt";
@@ -351,29 +384,38 @@ sub _fill {
             }
         }
 
-        my ( $meta, $text ) = Foswiki::Func::readTopic( $srcWeb, $topic );
+        my $copyTopic = sub {
+            my ($srcWeb, $topic, $target) = @_;
 
-        # copy topic (text)
-        unless ( Foswiki::Func::topicExists( $target, $topic ) ) {
-            Foswiki::Func::saveTopic( $target, $topic, $meta, $text );
-            $actionString .= "\n\n${levelstring}copied '$topic'";
-        }
+            my ( $meta, $text ) = Foswiki::Func::readTopic( $srcWeb, $topic );
 
-        # copy attachments
-        foreach my $attachment ( $meta->find( 'FILEATTACHMENT' ) ) {
-            my $filename = $attachment->{attachment};
-            unless ( -e "$Foswiki::cfg{PubDir}/$srcWeb/$topic/$filename" ) {
-                my $message = "Source attachment '$srcWeb/$topic/$filename' does not exist!";
-                Foswiki::Func::writeWarning($message);
-                $errorString .= "\n\n${levelstring}$message";
-                next;
+            # copy topic (text)
+            if ( !Foswiki::Func::topicExists( $target, $topic ) || (defined $overwriteTopics && $topic =~ m#$overwriteTopics#) ) {
+                Foswiki::Func::saveTopic( $target, $topic, $meta, $text );
+                $actionString .= "\n\n${levelstring}copied '$topic'";
             }
-            next if -e "$Foswiki::cfg{PubDir}/$target/$topic/$filename";
-            Foswiki::Func::copyAttachment( $srcWeb, $topic, $filename, $target, $topic, $filename );
-            $actionString .= "\n\n${levelstring}copied attachment '$target/$topic/$filename'";
+
+            # copy attachments
+            foreach my $attachment ( $meta->find( 'FILEATTACHMENT' ) ) {
+                my $filename = $attachment->{attachment};
+                unless ( -e "$Foswiki::cfg{PubDir}/$srcWeb/$topic/$filename" ) {
+                    my $message = "Source attachment '$srcWeb/$topic/$filename' does not exist!";
+                    Foswiki::Func::writeWarning($message);
+                    $errorString .= "\n\n${levelstring}$message";
+                    next;
+                }
+                next if -e "$Foswiki::cfg{PubDir}/$target/$topic/$filename";
+                Foswiki::Func::copyAttachment( $srcWeb, $topic, $filename, $target, $topic, $filename );
+                $actionString .= "\n\n${levelstring}copied attachment '$target/$topic/$filename'";
+            }
+        };
+
+        if ( $Foswiki::Plugins::SESSION->{store}->can('doWithoutVirtualTopics') ) {
+            $Foswiki::Plugins::SESSION->{store}->doWithoutVirtualTopics($copyTopic, $srcWeb, $topic, $target);
+        } else {
+            &$copyTopic($srcWeb, $topic, $target);
         }
     }
-
     if ( $recurseSrc ) {
         foreach my $eachWeb ( @srcSubwebs ) {
             my $subTarget = "$target/$eachWeb";
@@ -385,7 +427,7 @@ sub _fill {
                 $errorString .= $createErrors;
             }
 
-            my ( $subActions, $subErrors ) = _fill($subSrc, $recurseSrc, $subTarget, $recurseTarget, $skipWebs, $skipTopics, $depth + 1, $maxdepth, $keepSymlinks);
+            my ( $subActions, $subErrors ) = _fill($subSrc, $recurseSrc, $subTarget, $recurseTarget, $skipWebs, $skipTopics, $unskipTopics, $overwriteTopics, $depth + 1, $maxdepth, $keepSymlinks);
             $actionString .= $subActions;
             $errorString .= $subErrors;
         }
@@ -401,7 +443,7 @@ sub _fill {
             }
             next if $skip;
 
-            my ( $subActions, $subErrors ) = _fill($srcWeb, $recurseSrc, "$target/$targetSub", $recurseTarget, $skipWebs, $skipTopics, $depth + 1, $maxdepth, $keepSymlinks);
+            my ( $subActions, $subErrors ) = _fill($srcWeb, $recurseSrc, "$target/$targetSub", $recurseTarget, $skipWebs, $skipTopics, $unskipTopics, $overwriteTopics, $depth + 1, $maxdepth, $keepSymlinks);
             $actionString .= $subActions;
             $errorString .= $subErrors;
         }
