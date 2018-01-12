@@ -109,6 +109,7 @@ sub restFill {
                         param2   => "The name of the web you specified ($target) is invalid."
                     );
                     Foswiki::Func::redirectCgiQuery( undef, $url );
+                    return;
                 }
 
                 my ($createAction, $createErrors) = _createOrLinkWeb($target, $srcWeb, '', $keepSymlinks);
@@ -122,6 +123,7 @@ sub restFill {
                     param2   => "The web you specified ($target) does not exist and you are not creating a new web."
                 );
                 Foswiki::Func::redirectCgiQuery( undef, $url );
+                return;
             }
         }
 
