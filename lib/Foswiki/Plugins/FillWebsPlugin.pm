@@ -345,7 +345,12 @@ sub _fill {
     foreach my $topic ( @topics ) {
         unless (defined $unskipTopics && $topic =~ m#$unskipTopics#) {
             next if $skipTopics && $topic =~ m#$skipTopics#;
-            next if $Foswiki::Plugins::SESSION->{store}->can('isVirtualTopic') && $Foswiki::Plugins::SESSION->{store}->isVirtualTopic($srcWeb, $topic);
+            if ($Foswiki::Plugins::SESSION->{store}->can('isVirtualTopic') && $Foswiki::Plugins::SESSION->{store}->isVirtualTopic($srcWeb, $topic)) {
+                if ($Foswiki::cfg{Plugins}{FormGeneratorPlugin}{Enabled}) {
+                    Foswiki::Plugins::FormGeneratorPlugin::onChange($target, $topic, $target, $topic);
+                }
+                next;
+            }
         }
 
         if ( $keepSymlinks ) {
