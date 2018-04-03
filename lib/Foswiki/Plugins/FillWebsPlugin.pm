@@ -57,6 +57,7 @@ sub restFill {
 
     my $srcWeb = $query->{param}->{srcweb} || [ '_default' ];
     my $target = $query->{param}->{target};
+
     my $recurseSrc = $query->{param}->{recursesrc};
     $recurseSrc = $recurseSrc->[0] if $recurseSrc;
     my $recursive = $query->{param}->{recursive};
@@ -101,7 +102,7 @@ sub restFill {
         $target = (Foswiki::Func::normalizeWebTopicName( $target->[0], 'WebHome' ))[0];
         unless( Foswiki::Func::webExists( $target ) ) {
             if ( $createWeb ) {
-                unless ( Foswiki::Func::isValidWebName( $target ) ) {
+                unless ( _isValidWebName( $target ) ) {
                     my $url = Foswiki::Func::getScriptUrl(
                         $web, $topic, 'oops',
                         template => "oopsgeneric",
@@ -301,6 +302,16 @@ sub fill {
 
     return _fill($srcWeb, $recurseSrc, $target, $recurseTarget, $skipWebs, $skipTopics, $unskipTopics, $overwriteTopics, 0, $maxdepth, $keepSymlinks);
 }
+
+
+sub _isValidWebName{
+    my ( $webName ) = @_;
+    if($webName =~ /^[a-zA-Z0-9]*$/ ){
+        return 1;
+    }
+    return 0;
+}
+
 
 sub _fill {
     my ( $srcWeb, $recurseSrc, $target, $recurseTarget, $skipWebs, $skipTopics, $unskipTopics, $overwriteTopics, $depth,  $maxdepth, $keepSymlinks ) = @_;
