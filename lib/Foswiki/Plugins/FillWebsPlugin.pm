@@ -57,7 +57,6 @@ sub restFill {
 
     my $srcWeb = $query->{param}->{srcweb} || [ '_default' ];
     my $target = $query->{param}->{target};
-
     my $recurseSrc = $query->{param}->{recursesrc};
     $recurseSrc = $recurseSrc->[0] if $recurseSrc;
     my $recursive = $query->{param}->{recursive};
@@ -303,15 +302,13 @@ sub fill {
     return _fill($srcWeb, $recurseSrc, $target, $recurseTarget, $skipWebs, $skipTopics, $unskipTopics, $overwriteTopics, 0, $maxdepth, $keepSymlinks);
 }
 
-
 sub _isValidWebName{
     my ( $webName ) = @_;
-    if($webName =~ /^[a-zA-Z0-9]*$/ ){
-        return 1;
+    if( $webName =~ /^[a-zA-Z0-9]*$/ ){
+        return Foswiki::Func::isValidWebName( $webName );
     }
     return 0;
 }
-
 
 sub _fill {
     my ( $srcWeb, $recurseSrc, $target, $recurseTarget, $skipWebs, $skipTopics, $unskipTopics, $overwriteTopics, $depth,  $maxdepth, $keepSymlinks ) = @_;
