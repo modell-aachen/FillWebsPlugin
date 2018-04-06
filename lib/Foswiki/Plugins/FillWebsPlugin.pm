@@ -101,7 +101,7 @@ sub restFill {
         $target = (Foswiki::Func::normalizeWebTopicName( $target->[0], 'WebHome' ))[0];
         unless( Foswiki::Func::webExists( $target ) ) {
             if ( $createWeb ) {
-                unless ( Foswiki::Func::isValidWebName( $target ) ) {
+                unless ( _isValidWebName( $target ) ) {
                     my $url = Foswiki::Func::getScriptUrl(
                         $web, $topic, 'oops',
                         template => "oopsgeneric",
@@ -302,6 +302,14 @@ sub fill {
     return _fill($srcWeb, $recurseSrc, $target, $recurseTarget, $skipWebs, $skipTopics, $unskipTopics, $overwriteTopics, 0, $maxdepth, $keepSymlinks);
 }
 
+sub _isValidWebName{
+    my ( $webName ) = @_;
+    if( $webName =~ /^[a-zA-Z0-9]*$/ ){
+        return Foswiki::Func::isValidWebName( $webName );
+    }
+    return 0;
+}
+
 sub _fill {
     my ( $srcWeb, $recurseSrc, $target, $recurseTarget, $skipWebs, $skipTopics, $unskipTopics, $overwriteTopics, $depth,  $maxdepth, $keepSymlinks ) = @_;
 
@@ -345,7 +353,12 @@ sub _fill {
     foreach my $topic ( @topics ) {
         unless (defined $unskipTopics && $topic =~ m#$unskipTopics#) {
             next if $skipTopics && $topic =~ m#$skipTopics#;
-            next if $Foswiki::Plugins::SESSION->{store}->can('isVirtualTopic') && $Foswiki::Plugins::SESSION->{store}->isVirtualTopic($srcWeb, $topic);
+            if ($Foswiki::Plugins::SESSION->{store}->can('isVirtualTopic') && $Foswiki::Plugins::SESSION->{store}->isVirtualTopic($srcWeb, $topic)) {
+                if ($Foswiki::cfg{Plugins}{FormGeneratorPlugin}{Enabled}) {
+                    Foswiki::Plugins::FormGeneratorPlugin::onChange($target, $topic, $target, $topic);
+                }
+                next;
+            }
         }
 
         if ( $keepSymlinks ) {
