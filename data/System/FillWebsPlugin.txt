@@ -96,7 +96,7 @@ Use this form to reset a web to a template. The existing web will be deleted and
 %STARTSECTION{"reset" type="include"}%
 %ADDTOZONE{"script" id="FillWebsPlugin" text="<script type='text/javascript' src='%PUBURLPATH%/%SYSTEMWEB%/FillWebsPlugin/fillwebsplugin.js' /></script>"}%
 <form action="%SCRIPTURL{"rest"}%/FillWebsPlugin/reset" class="fillwebsform"><div>
-| <label for="resetweb">Web to reset%BR%(%RED% *Attention!* This web will be moved to trash!%ENDCOLOR%)</label> | <input type="text" name="resetweb" value="" /> |
+| <label for="resetweb">Web to reset%BR%(%RED{encode="none"}% *Attention!* This web will be moved to trash!%ENDCOLOR{encode="none"}%)</label> | <input type="text" name="resetweb" value="" /> |
 | <label for="srcweb">SourceWeb for the topics</label> | <input type="text" name="srcweb" value="_default" /> |
 | <label for="recursivesrc">Recurse into subwebs of SourceWeb</label> | <input type="checkbox" name="recursesrc" value="1" /> |
 | <input type="submit" value="Reset web"/> ||
